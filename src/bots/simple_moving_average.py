@@ -43,30 +43,34 @@ class TradeBotSimpleMovingAverage(TradeBot):
 
     def make_order_recommendation(self, ticker):
         """
-        Makes a recommendation for a market order by comparing the 50-day moving average to the 200-day moving average.
+        Makes a recommendation based on 180-day (6-month) and 365-day (1-year) moving averages
+        for more stable, long-term trading signals.
 
-        :param ticker: A company's ticker symbol as a string=
+        :param ticker: A company's ticker symbol as a string
         :return: OrderType recommendation
         """
-
         if not ticker:
             print("ERROR: ticker cannot be a null value")
             return None
 
-        stock_history_df = self.get_stock_history_dataframe(ticker)
+        # Get 2 years of data to calculate yearly MA
+        stock_history_df = self.get_stock_history_dataframe(ticker, interval="day", time_span="5year")
 
-        # Calculate the 200-day moving average.
-        moving_average_200_day = self.calculate_simple_moving_average(stock_history_df, 200)
+        # Calculate moving averages
+        moving_average_365_day = self.calculate_simple_moving_average(stock_history_df, 365)  # 1 year
+        moving_average_180_day = self.calculate_simple_moving_average(stock_history_df, 180)  # 6 months
 
-        # Calculate the 50-day moving average.
-        moving_average_50_day = self.calculate_simple_moving_average(stock_history_df, 50)
+        print(f"\nAnalysis for {ticker}:")
+        print(f"180-day MA: ${moving_average_180_day:.2f}")
+        print(f"365-day MA: ${moving_average_365_day:.2f}")
 
-        # Determine the order recommendation.
-        if moving_average_50_day > moving_average_200_day:
+        # More conservative threshold for trading decisions (1% difference)
+        threshold = 0.01
+        difference_percentage = (moving_average_180_day - moving_average_365_day) / moving_average_365_day
+
+        if difference_percentage > threshold:
             return OrderType.BUY_RECOMMENDATION
-
-        elif moving_average_50_day < moving_average_200_day:
+        elif difference_percentage < -threshold:
             return OrderType.SELL_RECOMMENDATION
-
         else:
             return OrderType.HOLD_RECOMMENDATION
