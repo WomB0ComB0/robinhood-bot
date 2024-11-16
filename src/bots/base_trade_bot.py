@@ -265,6 +265,7 @@ class TradeBot:
             cash = float(account.get("cash", 0.0))
 
             # Debug logging
+            logger.debug("API Response - Account Data: %s", account)
             logger.debug("API Response - Buying Power: $%.2f, Cash: $%.2f", buying_power, cash)
 
             # Use the smaller of buying power or cash to be conservative
