@@ -2,6 +2,8 @@ from enum import Enum
 
 import pandas as pd
 import pyotp
+import re
+import binascii
 import robin_stocks.robinhood as robinhood
 
 from src.utilities import RobinhoodCredentials
@@ -16,7 +18,6 @@ class OrderType(Enum):
 class TradeBot:
     def __init__(self):
         """Logs user into their Robinhood account."""
-
         robinhood_credentials = RobinhoodCredentials()
         totp = None
 
@@ -26,12 +27,27 @@ class TradeBot:
                 "Robinhood account uses MFA to log in, this will fail and may lock you out of your accounts for "
                 "some period of time."
             )
-
         else:
-            totp = pyotp.TOTP(robinhood_credentials.mfa_code).now()
+            try:
+                # Sanitize and validate mfa_code
+                mfa_code = robinhood_credentials.mfa_code
+                sanitized_code = re.sub(r'[^A-Z2-7]', '', mfa_code.upper().strip())
+
+                try:
+                    # Test if valid base32 by attempting to decode
+                    binascii.unhexlify(sanitized_code)
+                except binascii.Error:
+                    raise ValueError("Invalid TOTP secret.")
+
+                # Generate TOTP code
+                totp = pyotp.TOTP(sanitized_code).now()
+
+            except (ValueError, binascii.Error) as e:
+                print(f"ERROR: Invalid MFA code format: {str(e)}")
+                raise
 
         robinhood.login(robinhood_credentials.user, robinhood_credentials.password, mfa_code=totp)
-
+        
     def robinhood_logout(self):
         """Logs user out of their Robinhood account."""
 
