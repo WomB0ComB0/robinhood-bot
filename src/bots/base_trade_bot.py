@@ -2,8 +2,6 @@ from enum import Enum
 
 import pandas as pd
 import pyotp
-import re
-import binascii
 import robin_stocks.robinhood as robinhood
 
 from src.utilities import RobinhoodCredentials
@@ -18,37 +16,22 @@ class OrderType(Enum):
 class TradeBot:
     def __init__(self):
         """Logs user into their Robinhood account."""
+
         robinhood_credentials = RobinhoodCredentials()
         totp = None
 
-        if robinhood_credentials.mfa_code:
-            try:
-                mfa_code = re.sub(r'[^A-Z2-7]', '', robinhood_credentials.mfa_code.upper().strip())
-                
-                totp = pyotp.TOTP(mfa_code).now()
-                print(f"Using MFA code for authentication")
-                
-            except Exception as e:
-                print(f"ERROR: Failed to generate TOTP code: {str(e)}")
-                raise
-        else:
+        if robinhood_credentials.mfa_code == "":
             print(
                 "WARNING: MFA code is not supplied. Multi-factor authentication will not be attempted. If your "
-                "Robinhood account uses MFA to log in, this will fail and may lock you out of your account for "
+                "Robinhood account uses MFA to log in, this will fail and may lock you out of your accounts for "
                 "some period of time."
             )
 
-        try:
-            robinhood.login(
-                username=robinhood_credentials.user,
-                password=robinhood_credentials.password,
-                mfa_code=totp
-            )
-            print("Successfully logged into Robinhood")
-        except Exception as e:
-            print(f"ERROR: Failed to login to Robinhood: {str(e)}")
-            raise
-        
+        else:
+            totp = pyotp.TOTP(robinhood_credentials.mfa_code).now()
+
+        robinhood.login(robinhood_credentials.user, robinhood_credentials.password, mfa_code=totp)
+
     def robinhood_logout(self):
         """Logs user out of their Robinhood account."""
 
