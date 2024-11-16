@@ -1,8 +1,11 @@
+#! /usr/bin/env python3
+# -*- coding: utf-8 -*-
+# vim:fenc=utf-8
+
 import os
 
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 

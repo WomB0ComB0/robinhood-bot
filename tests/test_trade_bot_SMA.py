@@ -25,5 +25,5 @@ class TestTradeBotSimpleMovingAverage:
     )
     def test_calculate_simple_moving_average(self, stock_history, number_of_days, expected):
         stock_history_df = pd.DataFrame(stock_history)
-        moving_average = self.trade_bot.calculate_simple_moving_average(stock_history_df, number_of_days)
+        moving_average = self.trade_bot.calculate_sma(stock_history_df, number_of_days)
         assert moving_average == expected
