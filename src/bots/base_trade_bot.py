@@ -21,32 +21,33 @@ class TradeBot:
         robinhood_credentials = RobinhoodCredentials()
         totp = None
 
-        if robinhood_credentials.mfa_code == "":
+        if robinhood_credentials.mfa_code:
+            try:
+                mfa_code = re.sub(r'[^A-Z2-7]', '', robinhood_credentials.mfa_code.upper().strip())
+                
+                totp = pyotp.TOTP(mfa_code).now()
+                print(f"Using MFA code for authentication")
+                
+            except Exception as e:
+                print(f"ERROR: Failed to generate TOTP code: {str(e)}")
+                raise
+        else:
             print(
                 "WARNING: MFA code is not supplied. Multi-factor authentication will not be attempted. If your "
-                "Robinhood account uses MFA to log in, this will fail and may lock you out of your accounts for "
+                "Robinhood account uses MFA to log in, this will fail and may lock you out of your account for "
                 "some period of time."
             )
-        else:
-            try:
-                # Sanitize and validate mfa_code
-                mfa_code = robinhood_credentials.mfa_code
-                sanitized_code = re.sub(r'[^A-Z2-7]', '', mfa_code.upper().strip())
 
-                try:
-                    # Test if valid base32 by attempting to decode
-                    binascii.unhexlify(sanitized_code)
-                except binascii.Error:
-                    raise ValueError("Invalid TOTP secret.")
-
-                # Generate TOTP code
-                totp = pyotp.TOTP(sanitized_code).now()
-
-            except (ValueError, binascii.Error) as e:
-                print(f"ERROR: Invalid MFA code format: {str(e)}")
-                raise
-
-        robinhood.login(robinhood_credentials.user, robinhood_credentials.password, mfa_code=totp)
+        try:
+            robinhood.login(
+                username=robinhood_credentials.user,
+                password=robinhood_credentials.password,
+                mfa_code=totp
+            )
+            print("Successfully logged into Robinhood")
+        except Exception as e:
+            print(f"ERROR: Failed to login to Robinhood: {str(e)}")
+            raise
         
     def robinhood_logout(self):
         """Logs user out of their Robinhood account."""
