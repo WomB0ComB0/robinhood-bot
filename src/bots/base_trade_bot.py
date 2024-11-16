@@ -264,6 +264,9 @@ class TradeBot:
             buying_power = float(account.get("buying_power", 0.0))
             cash = float(account.get("cash", 0.0))
 
+            # Debug logging
+            logger.debug("API Response - Buying Power: $%.2f, Cash: $%.2f", buying_power, cash)
+
             # Use the smaller of buying power or cash to be conservative
             available_cash = min(buying_power, cash)
 
