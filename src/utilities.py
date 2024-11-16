@@ -26,6 +26,7 @@ class RobinhoodCredentials:
         self.user = os.getenv("ROBINHOOD_USER")
         self.password = os.getenv("ROBINHOOD_PASS")
         self.mfa_code = os.getenv("ROBINHOOD_MFA_CODE")
+        print(f"Loaded credentials: User={self.user}, MFA Code={self.mfa_code}")
 
     @property
     def empty_credentials(self):

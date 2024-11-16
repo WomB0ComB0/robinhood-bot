@@ -13,7 +13,16 @@ from dataclasses import dataclass
 from src.utilities import RobinhoodCredentials
 from src.bots.config import TradingConfig, StrategyType, OrderType
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# Configure logging to write to a file
+logging.basicConfig(
+    level=logging.DEBUG,  # Set to DEBUG to capture all logs
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("trade_bot.log"),  # Log to a file named trade_bot.log
+        logging.StreamHandler()  # Also log to the console
+    ]
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,11 +51,18 @@ class TradeBot:
         credentials = RobinhoodCredentials()
         totp = None
 
+        logger.debug("Starting authentication process.")
+        logger.debug("User: %s", credentials.user)
+        logger.debug("MFA Code: %s", credentials.mfa_code)  # Ensure this is a valid base32 string
+
         if credentials.mfa_code:
+            logger.debug("MFA code is provided, attempting to generate TOTP.")
             try:
                 totp = pyotp.TOTP(credentials.mfa_code).now()
             except Exception as e:
                 logger.error("Failed to generate MFA code: %s", e)
+                logger.debug("MFA code provided: %s", credentials.mfa_code)
+                logger.debug("Ensure the MFA code is a valid base32 string.")
                 raise ValueError("Invalid MFA configuration") from e
 
         try:
