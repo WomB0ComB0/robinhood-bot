@@ -15,22 +15,30 @@ class OrderType(Enum):
 
 class TradeBot:
     def __init__(self):
-        """Logs user into their Robinhood account."""
-
+        """Logs user into their Robinhood account using MFA if configured."""
         robinhood_credentials = RobinhoodCredentials()
         totp = None
 
-        if robinhood_credentials.mfa_code == "":
+        if robinhood_credentials.mfa_code:
+            # Generate TOTP code if MFA is configured
+            totp = pyotp.TOTP(robinhood_credentials.mfa_code).now()
+            print(f"Using MFA code: {totp}")
+        else:
             print(
                 "WARNING: MFA code is not supplied. Multi-factor authentication will not be attempted. If your "
                 "Robinhood account uses MFA to log in, this will fail and may lock you out of your accounts for "
                 "some period of time."
             )
 
-        else:
-            totp = pyotp.TOTP(robinhood_credentials.mfa_code).now()
-
-        robinhood.login(robinhood_credentials.user, robinhood_credentials.password, mfa_code=totp)
+        # Login with credentials and optional MFA
+        login_response = robinhood.login(
+            robinhood_credentials.user,
+            robinhood_credentials.password, 
+            mfa_code=totp
+        )
+        
+        if not login_response:
+            raise Exception("Failed to login to Robinhood")
 
     def robinhood_logout(self):
         """Logs user out of their Robinhood account."""
