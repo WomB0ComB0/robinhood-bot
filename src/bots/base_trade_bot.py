@@ -19,8 +19,8 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler("trade_bot.log"),  # Log to a file named trade_bot.log
-        logging.StreamHandler()  # Also log to the console
-    ]
+        logging.StreamHandler(),  # Also log to the console
+    ],
 )
 
 logger = logging.getLogger(__name__)

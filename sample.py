@@ -33,7 +33,17 @@ def is_market_open():
     current_time = dt_time(now.hour, now.minute)
     market_open = dt_time(9, 30)
     market_close = dt_time(16, 0)
-    return now.weekday() < 5 and market_open <= current_time <= market_close
+
+    # Add detailed logging
+    is_weekday = now.weekday() < 5
+    is_market_hours = market_open <= current_time <= market_close
+
+    logging.info("Current time: %s", current_time)
+    logging.info("Market hours: %s - %s", market_open, market_close)
+    logging.info("Is weekday: %s", is_weekday)
+    logging.info("Is during market hours: %s", is_market_hours)
+
+    return is_weekday and is_market_hours
 
 
 def main():
@@ -54,9 +64,11 @@ def main():
         while True:
             try:
                 if not is_market_open():
-                    logging.info("Market is closed. Waiting...")
-                    time.sleep(3600)
+                    logging.info("Market is closed. Waiting for market hours...")
+                    time.sleep(300)
                     continue
+
+                logging.info("Market is open. Starting trading operations...")
 
                 portfolio_value = sum(float(pos["equity"]) for pos in tb.get_current_positions().values())
 
@@ -66,25 +78,30 @@ def main():
                     for ticker in tickers:
                         try:
                             current_price = tb.get_current_market_price(ticker)
-                            recommendation = tb.make_order_recommendation(ticker)
+                            logging.info("Current price for %s: $%.2f", ticker, current_price)
 
-                            position = tb.get_current_positions().get(ticker, {})
-                            position_value = float(position.get("equity", 0))
+                            if current_price > 0:
+                                recommendation = tb.make_order_recommendation(ticker)
 
-                            # Calculate position size based on portfolio
-                            max_position = portfolio_value * config.risk_management.max_portfolio_per_stock
-                            available_to_buy = max(0, max_position - position_value)
-                            trade_amount = min(config.risk_management.max_trade_amount, available_to_buy)
+                                position = tb.get_current_positions().get(ticker, {})
+                                position_value = float(position.get("equity", 0))
 
-                            logging.info("%s: $%.2f - %s", ticker, current_price, recommendation)
+                                # Calculate position size based on portfolio
+                                max_position = portfolio_value * config.risk_management.max_portfolio_per_stock
+                                available_to_buy = max(0, max_position - position_value)
+                                trade_amount = min(config.risk_management.max_trade_amount, available_to_buy)
 
-                            if recommendation.value == 1 and trade_amount >= 0:
-                                tb.execute_buy_order(ticker, trade_amount)
-                            elif recommendation.value == 0 and position_value > 0:
-                                tb.execute_sell_order(
-                                    ticker, min(config.risk_management.max_trade_amount, position_value)
-                                )
-                            time.sleep(2)
+                                logging.info("%s: $%.2f - %s", ticker, current_price, recommendation)
+
+                                if recommendation.value == 1 and trade_amount >= 0:
+                                    tb.execute_buy_order(ticker, trade_amount)
+                                elif recommendation.value == 0 and position_value > 0:
+                                    tb.execute_sell_order(
+                                        ticker, min(config.risk_management.max_trade_amount, position_value)
+                                    )
+                                time.sleep(2)
+                            else:
+                                logging.warning("Unable to get valid price for %s", ticker)
 
                         except (KeyError, ValueError, pd.errors.EmptyDataError) as e:
                             logging.error("Error analyzing %s: %s", ticker, e)
