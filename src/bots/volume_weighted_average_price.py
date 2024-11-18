@@ -136,8 +136,9 @@ class TradeBotVWAP:
     ) -> OrderType:
         """Make trading decision based on VWAP analysis and risk management."""
         try:
+            # Get both intraday and daily data
             intraday_df = self.get_stock_history_dataframe(ticker, interval="5minute", span="day")
-            daily_df = self.get_stock_history_dataframe(ticker, interval="day", span="month")
+            daily_df = self.get_stock_history_dataframe(ticker, interval="day", span="year")
 
             intraday_metrics = self.calculate_vwap_metrics(intraday_df)
             daily_metrics = self.calculate_vwap_metrics(daily_df)
