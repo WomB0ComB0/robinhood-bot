@@ -248,29 +248,35 @@ class TradeBot:
     def get_stock_history_dataframe(self, ticker: str, interval: str, span: str) -> pd.DataFrame:
         """Fetch historical stock data from Robinhood and return as a DataFrame."""
         try:
-            historicals = robinhood.stocks.get_stock_historicals(ticker, interval=interval, span=span, bounds="regular")
+            # Override span to 'year' if requesting longer periods
+            if interval in ['day', 'week']:
+                span = 'year'
+            
+            historicals = robinhood.stocks.get_stock_historicals(
+                ticker, 
+                interval=interval, 
+                span=span,
+                bounds="regular"
+            )
 
             if not historicals:
                 logger.warning("No historical data available for %s", ticker)
                 return pd.DataFrame()
 
             df = pd.DataFrame(historicals)
-
-            # Convert string timestamps to datetime
             df["begins_at"] = pd.to_datetime(df["begins_at"])
-
+            
             # Convert price columns to float
             price_columns = ["open_price", "close_price", "high_price", "low_price"]
             for col in price_columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
-            # Convert volume to numeric
             df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
-
+            
             return df
 
-        except (KeyError, ValueError, pd.errors.EmptyDataError) as e:
-            logger.error("Error fetching historical data: %s", str(e))
+        except (Exception, pd.errors.EmptyDataError) as e:
+            logger.error("Error fetching historical data for %s: %s", ticker, str(e))
             return pd.DataFrame()
 
     def get_current_cash_position(self) -> float:
