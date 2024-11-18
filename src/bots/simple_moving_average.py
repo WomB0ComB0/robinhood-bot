@@ -300,21 +300,36 @@ class TradeBotSimpleMovingAverage(TradeBot):
             return pd.DataFrame()
 
     def get_current_market_price(self, ticker: str) -> float:
-        """Retrieve the current market price for the given ticker."""
+        """Retrieve the current market price with SMA context."""
         try:
-            quote = robinhood.stocks.get_quotes(ticker)
-            if not quote or not isinstance(quote, list) or not quote[0]:
-                raise ValueError("Unable to get quote for %s" % ticker)
-
-            current_price = float(quote[0].get("last_trade_price", 0.0))
+            current_price = super().get_current_market_price(ticker)
 
             if current_price <= 0:
-                raise ValueError("Invalid price (%s) for %s" % (current_price, ticker))
+                return 0.0
+
+            # Get recent historical data for SMA context
+            df = self.get_stock_history_dataframe(ticker, interval="5minute", span="day")
+
+            if df.empty:
+                return current_price
+
+            # Calculate SMAs for validation
+            short_term = self.calculate_technical_indicators(df, self.config.technical_indicators.sma_short_period)
+            long_term = self.calculate_technical_indicators(df, self.config.technical_indicators.sma_long_period)
+
+            # Only perform SMA validation if we have valid SMA values
+            if short_term["sma"] > 0:
+                if abs(current_price - short_term["sma"]) / short_term["sma"] > 0.1:
+                    logger.warning(
+                        "Current price %s deviates significantly from short-term SMA %s",
+                        current_price,
+                        short_term["sma"],
+                    )
 
             return current_price
 
         except (KeyError, ValueError, pd.errors.EmptyDataError) as e:
-            logger.error("Error fetching current price: %s", str(e))
+            logger.error("Error retrieving current market price: %s", str(e))
             return 0.0
 
     def check_risk_management(self, current_price: float, position: Dict[str, float]) -> bool:
