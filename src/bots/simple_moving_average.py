@@ -92,25 +92,37 @@ class TradeBotSimpleMovingAverage(TradeBot):
     ) -> Tuple[float, float, bool]:
         """
         Analyze market conditions using technical indicators.
-
-        Args:
-            short_term: Short-term technical indicators
-            long_term: Long-term technical indicators
-
-        Returns:
-            Tuple of (trend_strength, signal_strength, momentum_signal)
+        Returns neutral values if insufficient data.
         """
-        # Calculate trend strength using multiple factors
-        price_trend = (short_term["sma"] - long_term["sma"]) / long_term["sma"]
-        volatility_ratio = short_term["volatility"] / long_term["volatility"] if long_term["volatility"] > 0 else 1.0
+        try:
+            # Validate SMA values
+            if not long_term.get("sma") or long_term["sma"] == 0:
+                logger.warning("Invalid or zero long-term SMA value")
+                return 0.0, 0.0, False
 
-        trend_strength = abs(price_trend) * (1 + volatility_ratio)
+            if not short_term.get("sma"):
+                logger.warning("Invalid short-term SMA value")
+                return 0.0, 0.0, False
 
-        signal_strength = price_trend * (1 + abs(short_term["momentum"]))
+            # Calculate trend strength using multiple factors
+            price_trend = (short_term["sma"] - long_term["sma"]) / long_term["sma"]
+            
+            # Validate volatility values
+            volatility_ratio = (
+                short_term.get("volatility", 0) / long_term.get("volatility", 1)
+                if long_term.get("volatility", 0) > 0
+                else 1.0
+            )
 
-        momentum_signal = short_term["momentum"] > self.config.technical_indicators.momentum_threshold
+            trend_strength = abs(price_trend) * (1 + volatility_ratio)
+            signal_strength = price_trend * (1 + abs(short_term.get("momentum", 0)))
+            momentum_signal = short_term.get("momentum", 0) > self.config.technical_indicators.momentum_threshold
 
-        return trend_strength, signal_strength, momentum_signal
+            return trend_strength, signal_strength, momentum_signal
+
+        except (KeyError, ValueError, ZeroDivisionError) as e:
+            logger.warning("Error in market conditions analysis: %s", str(e))
+            return 0.0, 0.0, False
 
     def calculate_position_size(self, ticker: str, signal_strength: float) -> float:
         """
