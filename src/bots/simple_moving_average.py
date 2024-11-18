@@ -300,37 +300,27 @@ class TradeBotSimpleMovingAverage(TradeBot):
             return pd.DataFrame()
 
     def get_current_market_price(self, ticker: str) -> float:
-        """Retrieve the current market price with SMA context."""
-        try:
-            current_price = super().get_current_market_price(ticker)
-
-            if current_price <= 0:
-                return 0.0
-
+        """Get current market price with additional validation."""
+        current_price = super().get_current_market_price(ticker)
+        
+        if current_price > 0:
             # Get recent historical data for SMA context
             df = self.get_stock_history_dataframe(ticker, interval="5minute", span="day")
-
-            if df.empty:
-                return current_price
-
-            # Calculate SMAs for validation
-            short_term = self.calculate_technical_indicators(df, self.config.technical_indicators.sma_short_period)
-            long_term = self.calculate_technical_indicators(df, self.config.technical_indicators.sma_long_period)
-
-            # Only perform SMA validation if we have valid SMA values
-            if short_term["sma"] > 0:
-                if abs(current_price - short_term["sma"]) / short_term["sma"] > 0.1:
-                    logger.warning(
+            
+            if not df.empty:
+                # Calculate SMAs for validation
+                short_sma = df['close_price'].astype(float).rolling(window=5).mean().iloc[-1]
+                long_sma = df['close_price'].astype(float).rolling(window=20).mean().iloc[-1]
+                
+                # Log warning if price deviates significantly from SMAs
+                if short_sma and abs(current_price - short_sma) / short_sma > 0.1:
+                    self.logger.warning(
                         "Current price %s deviates significantly from short-term SMA %s",
                         current_price,
-                        short_term["sma"],
+                        short_sma
                     )
-
-            return current_price
-
-        except (KeyError, ValueError, pd.errors.EmptyDataError) as e:
-            logger.error("Error retrieving current market price: %s", str(e))
-            return 0.0
+        
+        return current_price
 
     def check_risk_management(self, current_price: float, position: Dict[str, float]) -> bool:
         """Enhanced risk management check incorporating SMA-specific criteria."""

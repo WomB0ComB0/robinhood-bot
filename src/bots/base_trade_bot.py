@@ -330,37 +330,26 @@ class TradeBot:
             return False
 
     def get_current_market_price(self, ticker: str) -> float:
-        """Retrieve the current market price with SMA context."""
+        """Retrieve the current market price with error handling."""
         try:
-            current_price = self.get_current_market_price(ticker)
-
-            if current_price <= 0:
+            # Get latest quote data from Robinhood
+            quote_data = robinhood.stocks.get_latest_price(ticker)
+            
+            if not quote_data or not quote_data[0]:
+                logger.warning("No price data available for %s", ticker)
                 return 0.0
-
-            # Get recent historical data for SMA context
-            df = self.get_stock_history_dataframe(ticker, interval="5minute", span="day")
-
-            if df.empty:
-                return current_price
-
-            # Calculate SMAs for validation
-            short_term = self._calculate_sma_signal(df)
-            long_term = self._calculate_sma_signal(df)
-
-            # Only perform SMA validation if we have valid SMA values
-            if short_term > 0:
-                if abs(current_price - short_term) / short_term > 0.1:
-                    logger.warning(
-                        "Current price %s deviates significantly from short-term SMA %s",
-                        current_price,
-                        short_term,
-                    )
-
+            
+            current_price = float(quote_data[0])
+            
+            if current_price <= 0:
+                logger.warning("Invalid price returned for %s: %f", ticker, current_price)
+                return 0.0
+            
             return current_price
 
-        except (KeyError, ValueError, pd.errors.EmptyDataError) as e:
-            logger.error("Error retrieving current market price: %s", str(e))
-            return self.get_current_market_price(ticker)
+        except (KeyError, ValueError, TypeError) as e:
+            logger.error("Error retrieving current market price for %s: %s", ticker, str(e))
+            return 0.0
 
     def get_current_positions(self) -> Dict[str, Dict]:
         """Retrieve the current positions held in the account."""
