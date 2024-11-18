@@ -9,7 +9,7 @@ import numpy as np
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from src.bots.config import OrderType
-
+import robin_stocks.robinhood as robinhood
 
 @dataclass
 class VWAPMetrics:
@@ -68,27 +68,34 @@ class TradeBotVWAP:
         return logger
 
     def get_stock_history_dataframe(self, ticker: str, interval: str, span: str) -> pd.DataFrame:
-        """Retrieve stock history data as a DataFrame."""
+        """Fetch historical stock data from Robinhood and return as a DataFrame."""
         try:
-            import yfinance as yf
+            # Use 'year' span instead of 'day' to get more data points
+            historicals = robinhood.stocks.get_stock_historicals(
+                ticker, 
+                interval=interval, 
+                span="year",  # Changed from 'day' to 'year'
+                bounds="regular"
+            )
 
-            interval_mapping = {"1minute": "1m", "5minute": "5m", "15minute": "15m", "day": "1d", "week": "1wk"}
+            if not historicals:
+                self.logger.warning("No historical data available for %s", ticker)
+                return pd.DataFrame()
 
-            span_mapping = {"day": "1d", "week": "1wk", "month": "1mo", "year": "1y"}
-
-            yf_interval = interval_mapping.get(interval, "5m")
-            yf_period = span_mapping.get(span, "1d")
-
-            stock = yf.Ticker(ticker)
-            df = stock.history(period=yf_period, interval=yf_interval)
-
-            df = df.rename(columns={"Close": "close_price", "Volume": "volume", "High": "high", "Low": "low"})
-
+            df = pd.DataFrame(historicals)
+            df["begins_at"] = pd.to_datetime(df["begins_at"])
+            
+            # Convert price columns to float
+            for col in ["open_price", "close_price", "high_price", "low_price"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+            
+            df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
+            
             return df
 
-        except (KeyError, ValueError, pd.errors.EmptyDataError) as e:
-            self.logger.error("Error fetching stock data: %s", str(e))
-            return pd.DataFrame(columns=["close_price", "volume", "high", "low"])
+        except (Exception, pd.errors.EmptyDataError) as e:
+            self.logger.error("Error fetching historical data for %s: %s", ticker, str(e))
+            return pd.DataFrame()
 
     def calculate_vwap_metrics(self, df: pd.DataFrame) -> VWAPMetrics:
         """Calculate VWAP and related metrics from price and volume data."""
@@ -166,8 +173,8 @@ class TradeBotVWAP:
 
             return OrderType.HOLD_RECOMMENDATION
 
-        except Exception as e:
-            self.logger.error(f"Error making trading decision: {e}")
+        except (Exception, pd.errors.EmptyDataError) as e:
+            self.logger.error("Error making trading decision: %s", str(e))
             return OrderType.HOLD_RECOMMENDATION
 
     def _check_risk_management(self, current_price: float, position: Dict[str, Any]) -> bool:
@@ -182,16 +189,16 @@ class TradeBotVWAP:
             position["highest_value"] = max(position.get("highest_value", position_value), position_value)
 
             if unrealized_pl < -self.config["stop_loss_percentage"]:
-                self.logger.info(f"Stop loss triggered at {unrealized_pl:.2%}")
+                self.logger.info("Stop loss triggered at %s", unrealized_pl)
                 return True
 
             if unrealized_pl > self.config["take_profit_percentage"]:
-                self.logger.info(f"Take profit triggered at {unrealized_pl:.2%}")
+                self.logger.info("Take profit triggered at %s", unrealized_pl)
                 return True
 
             trailing_stop_distance = self.config["trailing_stop"]
             if (position["highest_value"] - position_value) / position["highest_value"] > trailing_stop_distance:
-                self.logger.info("Trailing stop triggered at " + f"{position_value/position['highest_value']:.2%}")
+                self.logger.info("Trailing stop triggered at %s", position_value/position['highest_value'])
                 return True
 
             if position_value > self.config["max_position_size"]:
@@ -200,8 +207,8 @@ class TradeBotVWAP:
 
             return False
 
-        except Exception as e:
-            self.logger.error(f"Error in risk management: {e}")
+        except (Exception, pd.errors.EmptyDataError) as e:
+            self.logger.error("Error in risk management: %s", str(e))
             return False
 
     def update_performance_metrics(self, trade_result: Dict[str, Any]):
@@ -230,8 +237,8 @@ class TradeBotVWAP:
 
             self._update_advanced_metrics()
 
-        except Exception as e:
-            self.logger.error(f"Error updating performance metrics: {e}")
+        except (Exception, pd.errors.EmptyDataError) as e:
+            self.logger.error("Error updating performance metrics: %s", str(e))
 
     def _update_advanced_metrics(self):
         """Update advanced performance metrics."""

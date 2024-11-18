@@ -277,20 +277,16 @@ class TradeBot:
         """Retrieve the current cash position available for trading."""
         try:
             account = robinhood.account.build_user_profile()
-            buying_power = float(account.get("buying_power", 0.0))
             cash = float(account.get("cash", 0.0))
-
+            
             # Debug logging
             logger.debug("API Response - Account Data: %s", account)
-            logger.debug("API Response - Buying Power: $%.2f, Cash: $%.2f", buying_power, cash)
+            logger.debug("API Response - Cash: $%.2f", cash)
+            
+            logger.info("Current available cash position: $%.2f", cash)
+            return cash
 
-            # Use the smaller of buying power or cash to be conservative
-            available_cash = min(buying_power, cash)
-
-            logger.info("Current available cash position: $%.2f", available_cash)
-            return available_cash
-
-        except (KeyError, ValueError, pd.errors.EmptyDataError) as e:
+        except (KeyError, ValueError) as e:
             logger.error("Error fetching cash position: %s", str(e))
             return 0.0
 
