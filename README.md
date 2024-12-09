@@ -1,4 +1,5 @@
 # Robinhood Trading Bot
+
 A Python trading bot that uses Robinhood to execute market orders based on various trading algorithms.
 
 <h2> Setting Up </h2>

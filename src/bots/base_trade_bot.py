@@ -249,15 +249,10 @@ class TradeBot:
         """Fetch historical stock data from Robinhood and return as a DataFrame."""
         try:
             # Override span to 'year' if requesting longer periods
-            if interval in ['day', 'week']:
-                span = 'year'
-            
-            historicals = robinhood.stocks.get_stock_historicals(
-                ticker, 
-                interval=interval, 
-                span=span,
-                bounds="regular"
-            )
+            if interval in ["day", "week"]:
+                span = "year"
+
+            historicals = robinhood.stocks.get_stock_historicals(ticker, interval=interval, span=span, bounds="regular")
 
             if not historicals:
                 logger.warning("No historical data available for %s", ticker)
@@ -265,14 +260,14 @@ class TradeBot:
 
             df = pd.DataFrame(historicals)
             df["begins_at"] = pd.to_datetime(df["begins_at"])
-            
+
             # Convert price columns to float
             price_columns = ["open_price", "close_price", "high_price", "low_price"]
             for col in price_columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
             df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
-            
+
             return df
 
         except (Exception, pd.errors.EmptyDataError) as e:
@@ -284,11 +279,11 @@ class TradeBot:
         try:
             account = robinhood.account.build_user_profile()
             cash = float(account.get("cash", 0.0))
-            
+
             # Debug logging
             logger.debug("API Response - Account Data: %s", account)
             logger.debug("API Response - Cash: $%.2f", cash)
-            
+
             logger.info("Current available cash position: $%.2f", cash)
             return cash
 
@@ -336,17 +331,17 @@ class TradeBot:
         try:
             # Get latest quote data from Robinhood
             quote_data = robinhood.stocks.get_latest_price(ticker)
-            
+
             if not quote_data or not quote_data[0]:
                 logger.warning("No price data available for %s", ticker)
                 return 0.0
-            
+
             current_price = float(quote_data[0])
-            
+
             if current_price <= 0:
                 logger.warning("Invalid price returned for %s: %f", ticker, current_price)
                 return 0.0
-            
+
             return current_price
 
         except (KeyError, ValueError, TypeError) as e:

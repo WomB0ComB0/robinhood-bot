@@ -9,7 +9,6 @@ import numpy as np
 from typing import Optional, Dict, Tuple
 import logging
 from datetime import datetime, timezone
-import robin_stocks.robinhood as robinhood
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +105,7 @@ class TradeBotSimpleMovingAverage(TradeBot):
 
             # Calculate trend strength using multiple factors
             price_trend = (short_term["sma"] - long_term["sma"]) / long_term["sma"]
-            
+
             # Validate volatility values
             volatility_ratio = (
                 short_term.get("volatility", 0) / long_term.get("volatility", 1)
@@ -314,24 +313,22 @@ class TradeBotSimpleMovingAverage(TradeBot):
     def get_current_market_price(self, ticker: str) -> float:
         """Get current market price with additional validation."""
         current_price = super().get_current_market_price(ticker)
-        
+
         if current_price > 0:
             # Get recent historical data for SMA context
             df = self.get_stock_history_dataframe(ticker, interval="5minute", span="day")
-            
+
             if not df.empty:
                 # Calculate SMAs for validation
-                short_sma = df['close_price'].astype(float).rolling(window=5).mean().iloc[-1]
-                long_sma = df['close_price'].astype(float).rolling(window=20).mean().iloc[-1]
-                
+                short_sma = df["close_price"].astype(float).rolling(window=5).mean().iloc[-1]
+                long_sma = df["close_price"].astype(float).rolling(window=20).mean().iloc[-1]
+
                 # Log warning if price deviates significantly from SMAs
                 if short_sma and abs(current_price - short_sma) / short_sma > 0.1:
                     self.logger.warning(
-                        "Current price %s deviates significantly from short-term SMA %s",
-                        current_price,
-                        short_sma
+                        "Current price %s deviates significantly from short-term SMA %s", current_price, short_sma
                     )
-        
+
         return current_price
 
     def check_risk_management(self, current_price: float, position: Dict[str, float]) -> bool:

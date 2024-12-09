@@ -11,6 +11,7 @@ from datetime import datetime
 from src.bots.config import OrderType
 import robin_stocks.robinhood as robinhood
 
+
 @dataclass
 class VWAPMetrics:
     """Container for VWAP-related metrics"""
@@ -20,6 +21,74 @@ class VWAPMetrics:
     upper_band: float
     lower_band: float
     volume_ratio: float
+
+
+@dataclass
+class PortfolioMetrics:
+    total_equity: float
+    cash_available: float
+    positions: Dict[str, float]
+    sector_exposure: Dict[str, float]
+    beta_weighted_delta: float
+    sharpe_ratio: float
+    sortino_ratio: float
+
+
+class PortfolioManager:
+    def __init__(self, initial_capital: float, max_position_size: float = 0.2):
+        self.initial_capital = initial_capital
+        self.max_position_size = max_position_size
+        self.positions: Dict[str, Dict] = {}
+        self.sector_mappings: Dict[str, str] = self._initialize_sector_mappings()
+
+    def calculate_position_size(self, ticker: str, signal_strength: float, volatility: float) -> float:
+        """Calculate optimal position size using Kelly Criterion and volatility adjustment"""
+        portfolio_metrics = self.get_portfolio_metrics()
+        available_capital = portfolio_metrics.cash_available
+
+        # Kelly Criterion calculation
+        win_rate = 0.55  # Historical win rate
+        win_loss_ratio = 1.5  # Historical profit/loss ratio
+        kelly_percentage = (win_rate * win_loss_ratio - (1 - win_rate)) / win_loss_ratio
+
+        # Volatility adjustment
+        vol_factor = np.exp(-volatility)
+
+        # Position size calculation
+        base_size = available_capital * kelly_percentage * vol_factor
+        adjusted_size = base_size * abs(signal_strength)
+
+        # Apply position limits
+        max_allowed = available_capital * self.max_position_size
+        return min(adjusted_size, max_allowed)
+
+    def get_portfolio_metrics(self) -> PortfolioMetrics:
+        """Calculate comprehensive portfolio metrics"""
+        total_equity = sum(pos["market_value"] for pos in self.positions.values())
+        sector_exposure = self._calculate_sector_exposure()
+
+        returns = self._calculate_historical_returns()
+        sharpe = self._calculate_sharpe_ratio(returns)
+        sortino = self._calculate_sortino_ratio(returns)
+
+        return PortfolioMetrics(
+            total_equity=total_equity,
+            cash_available=self.initial_capital - total_equity,
+            positions=self.positions,
+            sector_exposure=sector_exposure,
+            beta_weighted_delta=self._calculate_portfolio_delta(),
+            sharpe_ratio=sharpe,
+            sortino_ratio=sortino,
+        )
+
+    def _calculate_portfolio_delta(self) -> float:
+        """Calculate portfolio delta for risk management"""
+        total_delta = 0.0
+        for ticker, position in self.positions.items():
+            beta = self._get_beta(ticker)
+            delta = position["market_value"] * beta
+            total_delta += delta
+        return total_delta
 
 
 class TradeBotVWAP:
@@ -72,10 +141,7 @@ class TradeBotVWAP:
         try:
             # Use 'year' span instead of 'day' to get more data points
             historicals = robinhood.stocks.get_stock_historicals(
-                ticker, 
-                interval=interval, 
-                span="year",  # Changed from 'day' to 'year'
-                bounds="regular"
+                ticker, interval=interval, span="year", bounds="regular"  # Changed from 'day' to 'year'
             )
 
             if not historicals:
@@ -84,13 +150,13 @@ class TradeBotVWAP:
 
             df = pd.DataFrame(historicals)
             df["begins_at"] = pd.to_datetime(df["begins_at"])
-            
+
             # Convert price columns to float
             for col in ["open_price", "close_price", "high_price", "low_price"]:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
-            
+
             df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
-            
+
             return df
 
         except (Exception, pd.errors.EmptyDataError) as e:
@@ -199,7 +265,7 @@ class TradeBotVWAP:
 
             trailing_stop_distance = self.config["trailing_stop"]
             if (position["highest_value"] - position_value) / position["highest_value"] > trailing_stop_distance:
-                self.logger.info("Trailing stop triggered at %s", position_value/position['highest_value'])
+                self.logger.info("Trailing stop triggered at %s", position_value / position["highest_value"])
                 return True
 
             if position_value > self.config["max_position_size"]:
@@ -289,4 +355,49 @@ class TradeBotVWAP:
             "max_drawdown": f"{self.performance_metrics['max_drawdown']:.2%}",
             "sharpe_ratio": f"{self.performance_metrics['sharpe_ratio']:.2f}",
             "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+
+
+class PerformanceAnalyzer:
+    def __init__(self):
+        self.trade_history: List[Dict] = []
+        self.daily_returns: pd.Series = pd.Series()
+        self.benchmark_returns: pd.Series = pd.Series()
+
+    def add_trade(self, trade: Dict[str, Any]) -> None:
+        """Record a new trade with enhanced metrics"""
+        self.trade_history.append(
+            {
+                **trade,
+                "timestamp": datetime.now(),
+                "market_conditions": self._get_market_conditions(),
+                "trade_metrics": self._calculate_trade_metrics(trade),
+            }
+        )
+        self._update_performance_metrics()
+
+    def get_performance_report(self) -> Dict[str, Any]:
+        """Generate comprehensive performance report"""
+        if not self.trade_history:
+            return self._empty_performance_report()
+
+        metrics = {
+            "total_return": self._calculate_total_return(),
+            "sharpe_ratio": self._calculate_sharpe_ratio(),
+            "sortino_ratio": self._calculate_sortino_ratio(),
+            "max_drawdown": self._calculate_max_drawdown(),
+            "win_rate": self._calculate_win_rate(),
+            "profit_factor": self._calculate_profit_factor(),
+            "risk_adjusted_return": self._calculate_risk_adjusted_return(),
+            "alpha": self._calculate_alpha(),
+            "beta": self._calculate_beta(),
+            "information_ratio": self._calculate_information_ratio(),
+        }
+
+        return {
+            **metrics,
+            "daily_stats": self._calculate_daily_statistics(),
+            "monthly_stats": self._calculate_monthly_statistics(),
+            "drawdown_analysis": self._analyze_drawdowns(),
+            "risk_metrics": self._calculate_risk_metrics(),
         }
