@@ -40,8 +40,8 @@ class TechnicalIndicators:
     """Configuration for technical indicators"""
 
     # SMA Configuration
-    sma_short_period: int = 180
-    sma_long_period: int = 365
+    sma_short_period: int = 20
+    sma_long_period: int = 50
 
     # VWAP Configuration
     vwap_period_days: int = 20
@@ -141,7 +141,11 @@ class SentimentAnalysis:
 class TradingConfig:
     """Configuration for trading"""
 
-    risk_management: RiskManagement = field(default_factory=RiskManagement)
+    risk_management: RiskManagement = field(
+        default_factory=lambda: RiskManagement(
+            min_trade_amount=5.00, max_trade_amount=50.00, stop_loss_percentage=0.02, take_profit_percentage=0.03
+        )
+    )
     technical_indicators: TechnicalIndicators = field(default_factory=TechnicalIndicators)
     sentiment_analysis: SentimentAnalysis = field(default_factory=SentimentAnalysis)
 
@@ -157,7 +161,7 @@ class TradingConfig:
     )
 
     enable_dynamic_threshold: bool = True
-    threshold_percentage: float = 0.01
+    threshold_percentage: float = 0.005
     volatility_adjustment: bool = True
     market_regime_aware: bool = True
     trade_threshold: float = 0.015

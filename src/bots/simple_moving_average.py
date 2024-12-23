@@ -135,11 +135,14 @@ class TradeBotSimpleMovingAverage(TradeBot):
             Position size in dollars
         """
         account_value = self.get_current_cash_position()
-        base_position = self.config.get_position_size(account_value, self._calculate_volatility(ticker))
 
-        confidence_factor = min(abs(signal_strength), 1.0)
-        adjusted_position = base_position * confidence_factor
+        # Use 25% of available cash per trade
+        base_position = min(account_value * 0.25, self.config.risk_management.max_trade_amount)
 
+        # Adjust based on signal strength
+        adjusted_position = base_position * abs(signal_strength)
+
+        # Ensure position meets minimum requirements
         return max(
             min(adjusted_position, self.config.risk_management.max_trade_amount),
             self.config.risk_management.min_trade_amount,
